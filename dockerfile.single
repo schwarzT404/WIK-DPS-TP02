@@ -1,0 +1,39 @@
+# Image de base légère
+FROM node:18-alpine
+
+# Métadonnées
+LABEL maintainer="DevOps Student <student@ynov.com>"
+LABEL description="API from WIK-DPS-TP01 in a single-stage Docker image"
+
+# Création d'un utilisateur non-root pour la sécurité
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier d'abord UNIQUEMENT les fichiers de dépendances pour optimiser le cache Docker
+COPY src/package.json src/package-lock.json* ./
+
+# Installer les dépendances
+RUN npm install && npm cache clean --force
+
+# Copier le reste des fichiers source
+COPY src/ ./
+
+# Compiler TypeScript en JavaScript
+RUN npm run build
+
+# Changer le propriétaire des fichiers
+RUN chown -R appuser:appgroup /app
+
+# Passer à l'utilisateur non-root
+USER appuser
+
+# Exposer le port
+EXPOSE 3000
+
+# Variable d'environnement pour configurer le port
+ENV PING_LISTEN_PORT=3000
+
+# Commande pour démarrer l'application
+CMD ["node", "dist/index.js"]

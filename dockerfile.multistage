@@ -1,0 +1,54 @@
+# Stage 1: Build
+FROM node:18-alpine AS builder
+
+# Définir le répertoire de travail pour l'étape de build
+WORKDIR /build
+
+# Copier d'abord les fichiers de dépendances
+COPY src/package.json src/package-lock.json* ./
+
+# Installer toutes les dépendances (y compris devDependencies)
+RUN npm install
+
+# Copier les fichiers source
+COPY src/ ./
+
+# Compiler TypeScript en JavaScript
+RUN npm run build
+
+# Stage 2: Runtime
+FROM node:18-alpine
+
+# Métadonnées
+LABEL maintainer="DevOps Student <student@ynov.com>"
+LABEL description="API from WIK-DPS-TP01 in a multi-stage Docker image"
+
+# Création d'un utilisateur non-root
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier uniquement package.json et package-lock.json
+COPY src/package.json src/package-lock.json* ./
+
+# Installer UNIQUEMENT les dépendances de production
+RUN npm install --production && npm cache clean --force
+
+# Copier uniquement les fichiers compilés du stage précédent
+COPY --from=builder /build/dist ./dist
+
+# Changer le propriétaire des fichiers
+RUN chown -R appuser:appgroup /app
+
+# Passer à l'utilisateur non-root
+USER appuser
+
+# Exposer le port
+EXPOSE 3000
+
+# Variable d'environnement pour configurer le port
+ENV PING_LISTEN_PORT=3000
+
+# Commande pour démarrer l'application
+CMD ["node", "dist/index.js"]
